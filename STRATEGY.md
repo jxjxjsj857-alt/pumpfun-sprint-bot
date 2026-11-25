@@ -26,11 +26,16 @@ capped at 0.2 SOL and total exposure at 8 SOL.
 
 ## Exits (first trigger sells the whole position)
 
-- Take-profit: value ≥ cost × 1.45
-- Stop-loss: value < cost × 0.80
-- Trailing stop: arms at cost × 1.15, exits at 25% below the peak value
+- Take-profit: value ≥ cost × 1.30
+- Stop-loss: value < cost × 0.85
+- Trailing stop: arms at cost × 1.10, exits at 20% below the peak value
 - Fade: 20-slot net flow < −0.8 SOL
-- Max hold: 1800 slots, unless the position is up ≥ 10%
+- Max hold: 1200 slots, unless the position is up ≥ 10%
+
+Both entry modes also require accelerating flow (newer-half net ≥ older-half
+net), the price not to have run too far inside one window (burst ≤ +30%,
+trend ≤ +60%), the last trade in the window to be a buy, and the curve's real
+SOL reserve to sit between 1 and 50 SOL.
 
 A completed curve is closed by the replay itself.
 

@@ -10,13 +10,19 @@
 //   TREND: the curve is older and its last 60 slots show sustained demand -
 //     at least 6 buys from at least 5 distinct wallets, net inflow of at least
 //     2 SOL and the price up at least 8%, still near its window high.
+// Both modes also require the flow to be accelerating (the newer half of the
+// window brings in at least as much net SOL as the older half), the price not
+// to have already run too far inside one window (burst +30%, trend +60%), the
+// last trade in the window to be a buy, and the curve's real SOL reserve to
+// sit between 1 and 50 SOL - tiny curves are untradeable noise, huge ones are
+// already past their run.
 //
 // The first buy is small. One pyramid add follows only while the price has stepped
 // up from the entry price and net SOL still flows in, so false starts cost little
 // and runners get size. A position is sold whole on the first of: take-profit
-// (+45% on cost), stop-loss (-20% on cost), a trailing stop once the position is
-// up 15% (exit 25% below its peak value), a fade exit when the last 20 slots of
-// flow turn negative, or a max hold - unless the position is already up 10%.
+// (+30% on cost), stop-loss (-15% on cost), a trailing stop once the position is
+// up 10% (exit 20% below its peak value), a fade exit when the last 20 slots of
+// flow turn negative, or a max hold of 1200 slots - unless the position is already up 10%.
 // A curve that completes is closed by the replay at its final reserves.
 //
 // Guardrail probes keep the run above the minimum bar (20 coins, each with a
@@ -50,6 +56,14 @@ export interface Params {
   burstMinUp: number;
   /** Trend: price now over price at window start, minus 1. */
   trendMinUp: number;
+  /** Upper bound on that rise: skip curves that already ran too far inside one window. */
+  burstMaxUp: number;
+  trendMaxUp: number;
+  /** Newer-half net inflow must be at least this multiple of the older half's (acceleration). */
+  accel: number;
+  /** Curve real SOL bounds at entry. */
+  minRqSol: number;
+  maxRqSol: number;
   /** Price now at least this share of the window high. */
   nearHigh: number;
   /** Largest single wallet's share of the window's buy SOL. */
@@ -107,14 +121,19 @@ export interface Params {
 export const DEFAULT_PARAMS: Params = {
   burstWindow: 20,
   trendWindow: 60,
-  burstMinNetSol: 0.5,
+  burstMinNetSol: 0.8,
   trendMinNetSol: 2,
   burstMinBuys: 4,
   trendMinBuys: 6,
-  burstMinBuyers: 3,
+  burstMinBuyers: 4,
   trendMinBuyers: 5,
   burstMinUp: 0.04,
   trendMinUp: 0.08,
+  burstMaxUp: 0.3,
+  trendMaxUp: 0.6,
+  accel: 1,
+  minRqSol: 1,
+  maxRqSol: 50,
   nearHigh: 0.95,
   maxBuyerShare: 0.6,
   burstMinAge: 20,
@@ -126,13 +145,13 @@ export const DEFAULT_PARAMS: Params = {
   stakeSol: 0.2,
   minBuySol: 0.01,
   buySlipBps: 1500,
-  takeProfit: 0.45,
-  stopLoss: 0.2,
-  trailArm: 0.15,
-  trail: 0.25,
+  takeProfit: 0.3,
+  stopLoss: 0.15,
+  trailArm: 0.1,
+  trail: 0.2,
   fadeWindow: 20,
   fadeNetSol: 0.8,
-  maxHold: 1800,
+  maxHold: 1200,
   holdIfUp: 0.1,
   cooldown: 200,
   maxEntries: 2,
@@ -198,12 +217,16 @@ export function createStrategy(p: Params = DEFAULT_PARAMS): Bot {
   /** Window statistics for one tape at slot `now` over the last `w` slots. */
   const windowStats = (t: Tape, now: number, w: number) => {
     const from = now - w;
+    const mid = now - w / 2;
     let buySol = 0;
     let sellSol = 0;
     let buys = 0;
+    let netOld = 0;
+    let netNew = 0;
     let startPrice = -1;
     let high = 0;
     let last = 0;
+    let lastIsBuy = false;
     const byUser = new Map<string, number>();
     for (const tr of t.trades) {
       if (tr.slot <= from) {
@@ -211,6 +234,9 @@ export function createStrategy(p: Params = DEFAULT_PARAMS): Bot {
         continue;
       }
       if (startPrice < 0) startPrice = tr.price;
+      const signed = tr.buy ? tr.sol : -tr.sol;
+      if (tr.slot <= mid) netOld += signed;
+      else netNew += signed;
       if (tr.buy) {
         buySol += tr.sol;
         buys++;
@@ -220,6 +246,7 @@ export function createStrategy(p: Params = DEFAULT_PARAMS): Bot {
       }
       if (tr.price > high) high = tr.price;
       last = tr.price;
+      lastIsBuy = tr.buy;
     }
     let top = 0;
     for (const v of byUser.values()) if (v > top) top = v;
@@ -231,6 +258,8 @@ export function createStrategy(p: Params = DEFAULT_PARAMS): Bot {
       nearHigh: high > 0 ? last / high : 0,
       topShare: buySol > 0 ? top / buySol : 1,
       last,
+      accelerating: netNew > 0 && netNew >= p.accel * netOld,
+      lastIsBuy,
     };
   };
 
@@ -369,29 +398,36 @@ export function createStrategy(p: Params = DEFAULT_PARAMS): Bot {
           if (t.entries >= p.maxEntries || now - t.lastExit < p.cooldown) continue;
           if (t.created === null) continue;
           const age = now - t.created;
+          const rqSol = Number(curve.real_quote_reserves) / LAMPORTS;
           let first: number | null = null;
-          if (age >= p.burstMinAge && age <= p.burstMaxAge) {
+          if (rqSol >= p.minRqSol && rqSol <= p.maxRqSol && age >= p.burstMinAge && age <= p.burstMaxAge) {
             const s = windowStats(t, now, p.burstWindow);
             if (
               s.net >= p.burstMinNetSol &&
               s.buys >= p.burstMinBuys &&
               s.buyers >= p.burstMinBuyers &&
               s.up >= p.burstMinUp &&
+              s.up <= p.burstMaxUp &&
               s.nearHigh >= p.nearHigh &&
-              s.topShare <= p.maxBuyerShare
+              s.topShare <= p.maxBuyerShare &&
+              s.accelerating &&
+              s.lastIsBuy
             ) {
               first = p.burstFirstSol;
             }
           }
-          if (first === null && age >= p.trendMinAge) {
+          if (first === null && rqSol >= p.minRqSol && rqSol <= p.maxRqSol && age >= p.trendMinAge) {
             const s = windowStats(t, now, p.trendWindow);
             if (
               s.net >= p.trendMinNetSol &&
               s.buys >= p.trendMinBuys &&
               s.buyers >= p.trendMinBuyers &&
               s.up >= p.trendMinUp &&
+              s.up <= p.trendMaxUp &&
               s.nearHigh >= p.nearHigh &&
-              s.topShare <= p.maxBuyerShare
+              s.topShare <= p.maxBuyerShare &&
+              s.accelerating &&
+              s.lastIsBuy
             ) {
               first = p.trendFirstSol;
             }
