@@ -13,7 +13,7 @@ Most pump.fun curves die fast, so the bot only risks money where the tape alread
 - **BURST entries** — a young curve (20–600 slots old) with a sudden burst of buying: several buys from several distinct wallets, net SOL flowing in, price up and near its short-window high.
 - **TREND entries** — an older curve whose buying keeps accelerating over a longer window.
 - **Small first buys, one pyramid add** into strength only, so false starts cost little and runners get size.
-- **Staged exits** — take-profit (+45%), stop-loss (−20%), a trailing stop once up 15%, a fade exit when flow turns negative, and a max hold.
+- **No take-profit** — winners run to curve completion; **staged exits** — stop-loss (−25%), a trailing stop once up 50%, a fade exit when flow turns negative, and a max hold.
 - **Guardrail probes** — tiny 0.01 SOL round trips keep the run above the minimum bar (20 coins with round trips) when fills or coins lag the pace.
 
 See [STRATEGY.md](STRATEGY.md) for the full parameter list and reasoning.

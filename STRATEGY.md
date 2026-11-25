@@ -10,27 +10,28 @@ that size.
 
 | Mode | Age (slots) | Window | Net SOL | Buys | Buyers | Min up | First buy |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| BURST | 20–600 | 20 | ≥ 0.5 | ≥ 4 | ≥ 3 | +4% | 0.04 SOL |
-| TREND | ≥ 600 | 60 | ≥ 2 | ≥ 6 | ≥ 5 | +8% | 0.06 SOL |
+| BURST | 20–600 | 20 | ≥ 2 | ≥ 4 | ≥ 6 | +4% | 0.01 SOL |
+| TREND | ≥ 600 | 60 | ≥ 4 | ≥ 6 | ≥ 6 | +8% | 0.015 SOL |
 
 Both modes also require the price to sit at ≥ 95% of the window high and the
 largest single buyer to hold ≤ 60% of the window's buy SOL (a one-wallet pump
-is not demand). At most 2 entries per curve, with a 200-slot cooldown after an
+is not demand). At most 1 entry per curve, with a 200-slot cooldown after an
 exit.
 
 ## Pyramid
 
-One add of 0.12 SOL, only while the price is ≥ 12% above the entry decision
+One add of 0.02 SOL, only while the price is ≥ 12% above the entry decision
 price and the 60-slot net flow is still ≥ 0.5 SOL. Total stake per curve is
-capped at 0.2 SOL and total exposure at 8 SOL.
+capped at 0.04 SOL and total exposure at 8 SOL.
 
 ## Exits (first trigger sells the whole position)
 
-- Take-profit: value ≥ cost × 1.30
-- Stop-loss: value < cost × 0.85
-- Trailing stop: arms at cost × 1.10, exits at 20% below the peak value
-- Fade: 20-slot net flow < −0.8 SOL
-- Max hold: 1200 slots, unless the position is up ≥ 10%
+- No take-profit: winners run to curve completion, where the replay closes
+  them at final reserves
+- Stop-loss: value < cost × 0.75
+- Trailing stop: arms at cost × 1.50, exits at 30% below the peak value
+- Fade: 20-slot net flow < −2 SOL
+- Max hold: 3000 slots, unless the position is up ≥ 10%
 
 Both entry modes also require accelerating flow (newer-half net ≥ older-half
 net), the price not to have run too far inside one window (burst ≤ +30%,

@@ -17,12 +17,14 @@
 // sit between 1 and 50 SOL - tiny curves are untradeable noise, huge ones are
 // already past their run.
 //
-// The first buy is small. One pyramid add follows only while the price has stepped
-// up from the entry price and net SOL still flows in, so false starts cost little
-// and runners get size. A position is sold whole on the first of: take-profit
-// (+30% on cost), stop-loss (-15% on cost), a trailing stop once the position is
-// up 10% (exit 20% below its peak value), a fade exit when the last 20 slots of
-// flow turn negative, or a max hold of 1200 slots - unless the position is already up 10%.
+// The first buy is tiny (0.01-0.015 SOL). One small pyramid add follows only
+// while the price has stepped up from the entry price and net SOL still flows
+// in. Stakes stay tiny because most curves die: the bot is a basket of small
+// bets, not a concentrated trade. There is no take-profit - winners are left
+// to run to curve completion, where the replay closes them at final reserves.
+// Losers are cut: a stop-loss at -25% on cost, a trailing stop once a position
+// is up 50% (exit 30% below its peak value), a fade exit when the last 20 slots
+// of flow turn strongly negative, or a max hold of 3000 slots.
 // A curve that completes is closed by the replay at its final reserves.
 //
 // Guardrail probes keep the run above the minimum bar (20 coins, each with a
@@ -41,17 +43,17 @@ export interface Params {
   /** Trend entry window in slots. */
   trendWindow: number;
   /** Burst: minimum net buy SOL (buys minus sells) over the burst window. */
-  burstMinNetSol: number;
+  burstMinNetSol: 2
   /** Trend: minimum net buy SOL over the trend window. */
-  trendMinNetSol: number;
+  trendMinNetSol: 4
   /** Burst: minimum buy trades in the window. */
   burstMinBuys: number;
   /** Trend: minimum buy trades in the window. */
   trendMinBuys: number;
   /** Burst: minimum distinct buying wallets in the window. */
-  burstMinBuyers: number;
+  burstMinBuyers: 6
   /** Trend: minimum distinct buying wallets in the window. */
-  trendMinBuyers: number;
+  trendMinBuyers: 6
   /** Burst: price now over price at window start, minus 1. */
   burstMinUp: number;
   /** Trend: price now over price at window start, minus 1. */
@@ -74,36 +76,36 @@ export interface Params {
   /** Trend entry allowed from this age (slots since CreateEvent). */
   trendMinAge: number;
   /** First buy size (SOL) for a burst entry. */
-  burstFirstSol: number;
+  burstFirstSol: 0.01
   /** First buy size (SOL) for a trend entry. */
-  trendFirstSol: number;
+  trendFirstSol: 0.015
   /** One pyramid add (SOL). */
-  addSol: number;
+  addSol: 0.02
   /** Total stake cap per curve (SOL). */
-  stakeSol: number;
+  stakeSol: 0.04
   /** Smallest buy worth sending (SOL). */
   minBuySol: number;
   /** Slippage on buys (bps); sells always go out at 10000. */
   buySlipBps: number;
   /** Take-profit: exit when value reaches cost * (1 + takeProfit). */
-  takeProfit: number;
+  takeProfit: 10
   /** Stop-loss: exit when value falls below cost * (1 - stopLoss). */
-  stopLoss: number;
+  stopLoss: 0.25
   /** Trailing stop arms once value reached cost * (1 + trailArm). */
-  trailArm: number;
+  trailArm: 0.5
   /** Trailing stop: exit when value falls below peak * (1 - trail). */
-  trail: number;
+  trail: 0.3
   /** Fade window in slots; exit when net SOL over it falls below -fadeNetSol. */
   fadeWindow: number;
-  fadeNetSol: number;
+  fadeNetSol: 2
   /** Exit after this many slots held (unless up at least holdIfUp). */
-  maxHold: number;
+  maxHold: 3000
   /** The time limit does not apply while the position is up at least this much. */
   holdIfUp: number;
   /** Slots to wait after an exit before the same curve may be bought again. */
   cooldown: number;
   /** Most entries per curve over the run. */
-  maxEntries: number;
+  maxEntries: 1
   /** Add only once the price is this much above the entry decision price. */
   addStep: number;
   /** Add only while net SOL over the trend window is at least this. */
@@ -121,12 +123,12 @@ export interface Params {
 export const DEFAULT_PARAMS: Params = {
   burstWindow: 20,
   trendWindow: 60,
-  burstMinNetSol: 0.8,
-  trendMinNetSol: 2,
+  burstMinNetSol: 2,
+  trendMinNetSol: 4,
   burstMinBuys: 4,
   trendMinBuys: 6,
-  burstMinBuyers: 4,
-  trendMinBuyers: 5,
+  burstMinBuyers: 6,
+  trendMinBuyers: 6,
   burstMinUp: 0.04,
   trendMinUp: 0.08,
   burstMaxUp: 0.3,
@@ -139,22 +141,22 @@ export const DEFAULT_PARAMS: Params = {
   burstMinAge: 20,
   burstMaxAge: 600,
   trendMinAge: 600,
-  burstFirstSol: 0.04,
-  trendFirstSol: 0.06,
-  addSol: 0.12,
-  stakeSol: 0.2,
+  burstFirstSol: 0.01,
+  trendFirstSol: 0.015,
+  addSol: 0.02,
+  stakeSol: 0.04,
   minBuySol: 0.01,
   buySlipBps: 1500,
-  takeProfit: 0.3,
-  stopLoss: 0.15,
-  trailArm: 0.1,
-  trail: 0.2,
+  takeProfit: 10,
+  stopLoss: 0.25,
+  trailArm: 0.5,
+  trail: 0.3,
   fadeWindow: 20,
-  fadeNetSol: 0.8,
-  maxHold: 1200,
+  fadeNetSol: 2,
+  maxHold: 3000,
   holdIfUp: 0.1,
   cooldown: 200,
-  maxEntries: 2,
+  maxEntries: 1,
   addStep: 0.12,
   addNetSol: 0.5,
   maxExposureSol: 8,

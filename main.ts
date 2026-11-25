@@ -10,8 +10,9 @@
 //           the price pushing up near its short-window high.
 //   TREND - an older curve whose buying keeps accelerating over a longer window.
 // Entries are small; one pyramid add is allowed into strength only. Every position
-// carries a take-profit, a stop-loss, a trailing stop once it is up, a max hold and
-// a fade exit when the flow turns against it. Small probe round trips keep the run
+// carries a stop-loss, a trailing stop once it is well up, a max hold and
+// a fade exit when the flow turns against it; there is no take-profit, so
+// winners run to curve completion. Small probe round trips keep the run
 // above the guardrail pace (at least 20 coins with round trips of >= 0.01 SOL).
 // Paper trading only: no real money moves anywhere in this repository.
 //
